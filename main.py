@@ -5,14 +5,15 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from flask import Flask
 from threading import Thread
 
-# إعداد بوت تليجرام
+# إعداد توكن البوت
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# معرفات قناتك والقروب الخاصة بك للاشتراك الإجباري
+# معرفات قناتك وقروبك للاشتراك الإجباري
 CHANNEL_USERNAME = "@shbin4"
 GROUP_USERNAME = "@Libya_Tbadl1"
 
+# --- دالة التحقق من اشتراك المستخدم في القناة والقروب ---
 def check_sub(user_id):
     try:
         chat_member = bot.get_chat_member(CHANNEL_USERNAME, user_id)
@@ -29,11 +30,12 @@ def check_sub(user_id):
         print(f"Error checking subscription: {e}")
         return False
 
+# --- أمر /start ---
 @bot.message_handler(commands=['start'])
 def start_command(message):
     user_id = message.from_user.id
     if check_sub(user_id):
-        bot.send_message(message.chat.id, "أهلاً بك يا غالي! أرسل رابط فيديو تيك توك الآن وسيتم تحميله بدون علامة مائية فوراً.")
+        bot.send_message(message.chat.id, "أهلاً بك يا غالي! 🌟\n\nأرسل رابط فيديو تيك توك الآن وسيتم تحميله بدون علامة مائية فوراً.")
     else:
         markup = InlineKeyboardMarkup()
         markup.add(InlineKeyboardButton("انضمام للقناة 📢", url=f"https://t.me/{CHANNEL_USERNAME.replace('@', '')}"))
@@ -42,10 +44,11 @@ def start_command(message):
         
         bot.send_message(
             message.chat.id, 
-            "عذراً، يجب عليك الانضمام إلى القناة والقروب أولاً لاستخدام البوت:\n\nبعد الانضمام اضغط على زر (تحقق من الاشتراك 👇)", 
+            "عذراً يا غالي، يجب عليك الانضمام إلى القناة والقروب أولاً لاستخدام البوت:\n\nبعد الانضمام اضغط على زر (تحقق من الاشتراك 👇)", 
             reply_markup=markup
         )
 
+# --- معالجة زر التحقق من الاشتراك ---
 @bot.callback_query_handler(func=lambda call: call.data == "check")
 def callback_check(call):
     user_id = call.from_user.id
@@ -54,27 +57,42 @@ def callback_check(call):
             bot.answer_callback_query(call.id, "تم التحقق بنجاح! ✅", show_alert=False)
             bot.send_message(call.message.chat.id, "ممتاز يا غالي! الآن أرسل رابط فيديو تيك توك لتحميله بدون علامة مائية.")
         else:
-            bot.answer_callback_query(call.id, "عذراً، لم تشترك في القناة والقروب بعد!", show_alert.get("show_alert", True))
+            bot.answer_callback_query(call.id, "عذراً، لم تشترك في القناة والقروب بعد!", show_alert=True)
     except Exception as e:
         bot.answer_callback_query(call.id, "حدث خطأ بسيط، حاول مجدداً.", show_alert=True)
 
+# --- معالجة واستلام رابط التيك توك وتنزيله ---
 @bot.message_handler(func=lambda message: "tiktok.com" in message.text)
 def handle_tiktok(message):
     user_id = message.from_user.id
+    
+    # فحص الاشتراك قبل التحميل
     if not check_sub(user_id):
-        bot.send_message(message.chat.id, "عذراً، يجب عليك الاشتراك في القناة والقروب أولاً لتتمكن من التحميل!")
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton("انضمام للقناة 📢", url=f"https://t.me/{CHANNEL_USERNAME.replace('@', '')}"))
+        markup.add(InlineKeyboardButton("انضمام للقروب 💬", url=f"https://t.me/{GROUP_USERNAME.replace('@', '')}"))
+        markup.add(InlineKeyboardButton("تحقق من الاشتراك ✅", callback_data="check"))
+        
+        bot.send_message(message.chat.id, "عذراً، يجب عليك الاشتراك في القناة والقروب أولاً لتتمكن من التحميل!", reply_markup=markup)
         return
 
     msg = bot.send_message(message.chat.id, "جاري تحميل الفيديو بدون علامة مائية... ⏳")
     
     try:
         url = message.text.strip()
-        api_url = f"https://www.tikwm.com/api/?url={url}"
+        
+        # إرسال طلب POST قوي ومباشر لـ TikWM
+        api_url = "https://www.tikwm.com/api/"
+        payload = {'url': url}
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json, text/javascript, */*; q=0.01',
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'Origin': 'https://www.tikwm.com',
+            'Referer': 'https://www.tikwm.com/'
         }
         
-        response = requests.get(api_url, headers=headers)
+        response = requests.post(api_url, data=payload, headers=headers)
         data_json = response.json()
 
         if data_json.get("code") == 0:
@@ -85,11 +103,23 @@ def handle_tiktok(message):
                 if video_url.startswith('/'):
                     video_url = f"https://www.tikwm.com{video_url}"
                     
-                bot.send_video(message.chat.id, video_url, caption="تم التحميل بنجاح بواسطة البوت ✨")
+                bot.send_video(message.chat.id, video_url, caption="تم التحميل بنجاح بدون علامة مائية ✨")
                 bot.delete_message(message.chat.id, msg.message_id)
                 return
 
-        bot.edit_message_text("عذراً، تعذر جلب الفيديو. تأكد من أن الرابط عام وصحيح.", message.chat.id, msg.message_id)
+        # طريقة احتياطية ثانية في حال التعليق
+        alt_url = f"https://tikwm.com/api/?url={url}"
+        alt_response = requests.get(alt_url, headers=headers).json()
+        if alt_response.get("code") == 0:
+            video_url = alt_response["data"].get("play")
+            if video_url:
+                if video_url.startswith('/'):
+                    video_url = f"https://www.tikwm.com{video_url}"
+                bot.send_video(message.chat.id, video_url, caption="تم التحميل بنجاح بدون علامة مائية ✨")
+                bot.delete_message(message.chat.id, msg.message_id)
+                return
+
+        bot.edit_message_text("عذراً، تعذر جلب الفيديو. تأكد من أن حساب صاحب الفيديو ليس خاصاً وأن الرابط صحيح.", message.chat.id, msg.message_id)
         
     except Exception as e:
         print(f"Error: {e}")
