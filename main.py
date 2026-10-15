@@ -9,7 +9,7 @@ from threading import Thread
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# معرفات قناتك والقروب الخاصة بك
+# معرفات قناتك والقروب الخاصة بك للاشتراك الإجباري
 CHANNEL_USERNAME = "@shbin4"
 GROUP_USERNAME = "@Libya_Tbadl1"
 
@@ -54,7 +54,7 @@ def callback_check(call):
             bot.answer_callback_query(call.id, "تم التحقق بنجاح! ✅", show_alert=False)
             bot.send_message(call.message.chat.id, "ممتاز يا غالي! الآن أرسل رابط فيديو تيك توك لتحميله بدون علامة مائية.")
         else:
-            bot.answer_callback_query(call.id, "عذراً، لم تشترك في القناة والقروب بعد!", show_alert=True)
+            bot.answer_callback_query(call.id, "عذراً، لم تشترك في القناة والقروب بعد!", show_alert.get("show_alert", True))
     except Exception as e:
         bot.answer_callback_query(call.id, "حدث خطأ بسيط، حاول مجدداً.", show_alert=True)
 
@@ -69,18 +69,17 @@ def handle_tiktok(message):
     
     try:
         url = message.text.strip()
-        # استخدام API الاحتياطي المضمون أكثر للروابط القصيرة
-        api_url = f"https://www.tikwm.com/api/?url={url}&hd=1"
+        api_url = f"https://www.tikwm.com/api/?url={url}"
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
         
-        response = requests.get(api_url, headers=headers).json()
+        response = requests.get(api_url, headers=headers)
+        data_json = response.json()
 
-        if response.get("code") == 0:
-            data = response.get("data", {})
-            # محاولة جلب الفيديو بجودة عالية HD أولاً، وإذا لم تتوفر يجلب العادي
-            video_url = data.get("hdplay") or data.get("play")
+        if data_json.get("code") == 0:
+            video_data = data_json.get("data", {})
+            video_url = video_data.get("play") or video_data.get("hdplay")
             
             if video_url:
                 if video_url.startswith('/'):
@@ -90,22 +89,11 @@ def handle_tiktok(message):
                 bot.delete_message(message.chat.id, msg.message_id)
                 return
 
-        # في حال فشل الرابط الأول، نجرب api بديل سريع
-        alt_api = f"https://tikwm.com/api/?url={url}"
-        alt_response = requests.get(alt_api, headers=headers).json()
-        if alt_response.get("code") == 0:
-            video_url = alt_response["data"].get("play")
-            if video_url:
-                if video_url.startswith('/'):
-                    video_url = f"https://www.tikwm.com{video_url}"
-                bot.send_video(message.chat.id, video_url, caption="تم التحميل بنجاح بواسطة البوت ✨")
-                bot.delete_message(message.chat.id, msg.message_id)
-                return
-
-        bot.edit_message_text("عذراً، تعذر جلب الفيديو. تأكد من أن الرابط عام وليس خاصاً وجرب رابطاً آخر.", message.chat.id, msg.message_id)
+        bot.edit_message_text("عذراً، تعذر جلب الفيديو. تأكد من أن الرابط عام وصحيح.", message.chat.id, msg.message_id)
         
     except Exception as e:
-        bot.edit_message_text(f"حدث خطأ تقني أثناء التحميل، حاول مجدداً.", message.chat.id, msg.message_id)
+        print(f"Error: {e}")
+        bot.edit_message_text("حدث خطأ تقني أثناء التحميل، حاول مجدداً.", message.chat.id, msg.message_id)
 
 # --- خادم ويب وهمي لكي يرضى موقع Render ولا يتوقف البوت ---
 app = Flask('')
