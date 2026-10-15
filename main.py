@@ -9,8 +9,9 @@ from threading import Thread
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 bot = telebot.TeleBot(BOT_TOKEN)
 
-CHANNEL_USERNAME = "@shbin4"  # استبدل بمعرف قناتك
-GROUP_USERNAME = "@Libya_Tbadl1"      # استبدل بمعرف قروبك
+# معرفات قناتك والقروب الخاصة بك
+CHANNEL_USERNAME = "@shbin4"
+GROUP_USERNAME = "@Libya_Tbadl1"
 
 def check_sub(user_id):
     try:
@@ -18,10 +19,14 @@ def check_sub(user_id):
         group_member = bot.get_chat_member(GROUP_USERNAME, user_id)
         
         valid_statuses = ['creator', 'administrator', 'member']
-        if chat_member.status in valid_statuses and group_member.status in valid_statuses:
+        is_in_channel = chat_member.status in valid_statuses
+        is_in_group = group_member.status in valid_statuses
+        
+        if is_in_channel and is_in_group:
             return True
         return False
-    except Exception:
+    except Exception as e:
+        print(f"Error checking subscription: {e}")
         return False
 
 @bot.message_handler(commands=['start'])
@@ -44,11 +49,14 @@ def start_command(message):
 @bot.callback_query_handler(func=lambda call: call.data == "check")
 def callback_check(call):
     user_id = call.from_user.id
-    if check_sub(user_id):
-        bot.answer_callback_query(call.id, "تم التحقق بنجاح! ✅")
-        bot.send_message(call.message.chat.id, "ممتاز! الآن أرسل رابط فيديو تيك توك لتحميله.")
-    else:
-        bot.answer_callback_query(call.id, "لم تشترك في القناة والقروب بعد!", show_alert=True)
+    try:
+        if check_sub(user_id):
+            bot.answer_callback_query(call.id, "تم التحقق بنجاح! ✅", show_alert=False)
+            bot.send_message(call.message.chat.id, "ممتاز يا غالي! الآن أرسل رابط فيديو تيك توك لتحميله بدون علامة مائية.")
+        else:
+            bot.answer_callback_query(call.id, "عذراً، لم تشترك في القناة والقروب بعد!", show_alert=True)
+    except Exception as e:
+        bot.answer_callback_query(call.id, "حدث خطأ بسيط، حاول مجدداً.", show_alert=True)
 
 @bot.message_handler(func=lambda message: "tiktok.com" in message.text)
 def handle_tiktok(message):
@@ -73,7 +81,6 @@ def handle_tiktok(message):
     except Exception as e:
         bot.edit_message_text("حدث خطأ أثناء تحميل الفيديو، حاول مجدداً.", message.chat.id, msg.message_id)
 
-
 # --- خادم ويب وهمي لكي يرضى موقع Render ولا يتوقف البوت ---
 app = Flask('')
 
@@ -88,8 +95,6 @@ def start_bot():
     bot.infinity_polling()
 
 if __name__ == "__main__":
-    # تشغيل سيرفر الويب في مسار خلفي
     t = Thread(target=run_web)
     t.start()
-    # تشغيل البوت الأساسي
     start_bot()
