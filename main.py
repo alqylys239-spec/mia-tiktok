@@ -69,17 +69,43 @@ def handle_tiktok(message):
     
     try:
         url = message.text.strip()
-        api_url = f"https://www.tikwm.com/api/?url={url}"
-        response = requests.get(api_url).json()
+        # استخدام API الاحتياطي المضمون أكثر للروابط القصيرة
+        api_url = f"https://www.tikwm.com/api/?url={url}&hd=1"
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+        
+        response = requests.get(api_url, headers=headers).json()
 
         if response.get("code") == 0:
-            video_url = response["data"]["play"]
-            bot.send_video(message.chat.id, video_url, caption="تم التحميل بنجاح بواسطة البوت ✨")
-            bot.delete_message(message.chat.id, msg.message_id)
-        else:
-            bot.edit_message_text("عذراً، تعذر جلب الفيديو. تأكد من أن الرابط صحيح.", message.chat.id, msg.message_id)
+            data = response.get("data", {})
+            # محاولة جلب الفيديو بجودة عالية HD أولاً، وإذا لم تتوفر يجلب العادي
+            video_url = data.get("hdplay") or data.get("play")
+            
+            if video_url:
+                if video_url.startswith('/'):
+                    video_url = f"https://www.tikwm.com{video_url}"
+                    
+                bot.send_video(message.chat.id, video_url, caption="تم التحميل بنجاح بواسطة البوت ✨")
+                bot.delete_message(message.chat.id, msg.message_id)
+                return
+
+        # في حال فشل الرابط الأول، نجرب api بديل سريع
+        alt_api = f"https://tikwm.com/api/?url={url}"
+        alt_response = requests.get(alt_api, headers=headers).json()
+        if alt_response.get("code") == 0:
+            video_url = alt_response["data"].get("play")
+            if video_url:
+                if video_url.startswith('/'):
+                    video_url = f"https://www.tikwm.com{video_url}"
+                bot.send_video(message.chat.id, video_url, caption="تم التحميل بنجاح بواسطة البوت ✨")
+                bot.delete_message(message.chat.id, msg.message_id)
+                return
+
+        bot.edit_message_text("عذراً، تعذر جلب الفيديو. تأكد من أن الرابط عام وليس خاصاً وجرب رابطاً آخر.", message.chat.id, msg.message_id)
+        
     except Exception as e:
-        bot.edit_message_text("حدث خطأ أثناء تحميل الفيديو، حاول مجدداً.", message.chat.id, msg.message_id)
+        bot.edit_message_text(f"حدث خطأ تقني أثناء التحميل، حاول مجدداً.", message.chat.id, msg.message_id)
 
 # --- خادم ويب وهمي لكي يرضى موقع Render ولا يتوقف البوت ---
 app = Flask('')
