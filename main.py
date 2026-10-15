@@ -5,7 +5,7 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from flask import Flask
 from threading import Thread
 
-# --- إعدادات البوت الأساسية ---
+# --- إعدادات التوكن والبوت ---
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 bot = telebot.TeleBot(BOT_TOKEN)
 
@@ -13,7 +13,7 @@ bot = telebot.TeleBot(BOT_TOKEN)
 CHANNEL_USERNAME = "@shbin4"
 GROUP_USERNAME = "@Libya_Tbadl1"
 
-# --- دالة فحص الاشتراك الإجباري ---
+# --- دالة التحقق من اشتراك المستخدم ---
 def check_sub(user_id):
     try:
         chat_member = bot.get_chat_member(CHANNEL_USERNAME, user_id)
@@ -78,25 +78,17 @@ def handle_tiktok(message):
     
     try:
         url = message.text.strip()
+        api_url = f"https://www.tikwm.com/api/?url={url}&hd=1"
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
         
-        # فك الرابط المختصر لضمان عمله بسلاسة
-        if "vt.tiktok.com" in url or "vm.tiktok.com" in url:
-            try:
-                r_short = requests.get(url, headers=headers, allow_redirects=True, timeout=10)
-                url = r_short.url.split('?')[0]
-            except Exception as e:
-                print(f"Error expanding URL: {e}")
-
-        api_url = f"https://tikwm.com/api/?url={url}"
         response = requests.get(api_url, headers=headers, timeout=15)
         data_json = response.json()
 
         if data_json.get("code") == 0:
             video_data = data_json.get("data", {})
-            video_url = video_data.get("play") or video_data.get("hdplay")
+            video_url = video_data.get("hdplay") or video_data.get("play")
             
             if video_url:
                 if video_url.startswith('/'):
@@ -106,22 +98,20 @@ def handle_tiktok(message):
                 bot.delete_message(message.chat.id, msg.message_id)
                 return
 
-        bot.edit_message_text("عذراً، تعذر جلب الفيديو. تأكد أن الرابط عام وليس خاصاً وجرب رابطاً آخر.", message.chat.id, msg.message_id)
+        bot.edit_message_text("عذراً، تعذر جلب الفيديو. تأكد أن الرابط عام وصحيح وجرب رابطاً آخر.", message.chat.id, msg.message_id)
         
     except Exception as e:
-        print(f"Main Error: {e}")
-        bot.edit_message_text("حدث خطأ تقني أثناء التحميل، حاول مجدداً.", message.chat.id, msg.message_id)
+        print(f"Download Error: {e}")
+        bot.edit_message_text("حدث خطأ أثناء الاتصال بسيرفر التحميل، حاول مجدداً بعد قليل.", message.chat.id, msg.message_id)
 
-# --- خطة وخادم الويب (Flask Web Server) ليبقى البوت شغالاً مجاناً على Render ---
+# --- خادم الويب الوهمي (Flask) للـ Web Service ليظل البوت شغالاً مجاناً ---
 app = Flask('')
 
 @app.route('/')
 def home():
-    app_status = "Bot is active and running 24/7!"
-    return app_status
+    return "Bot is active and running 24/7!"
 
 def run_web():
-    # استخدام المنفذ المخصص من بيئة العمل أو المنفذ الافتراضي 8080
     port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port)
 
@@ -129,9 +119,9 @@ def start_bot():
     bot.infinity_polling()
 
 if __name__ == "__main__":
-    # تشغيل سيرفر الويب في خلفية النظام
+    # تشغيل سيرفر الفلاسك في الخلفية
     web_thread = Thread(target=run_web)
     web_thread.start()
     
-    # تشغيل بوت تليجرام الأساسي
+    # تشغيل البوت الأساسي
     start_bot()
